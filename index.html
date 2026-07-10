@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>1000m Hardcore Jump</title>
   <style>
     :root {
@@ -20,13 +20,20 @@
       width: 100%;
       min-height: 100%;
       margin: 0;
+      overscroll-behavior: none;
     }
 
     body {
       display: grid;
       place-items: center;
-      padding: 16px;
-      overflow: hidden;
+      min-height: 100dvh;
+      padding:
+        max(10px, env(safe-area-inset-top))
+        max(10px, env(safe-area-inset-right))
+        max(10px, env(safe-area-inset-bottom))
+        max(10px, env(safe-area-inset-left));
+      overflow-x: hidden;
+      overflow-y: auto;
       background:
         radial-gradient(circle at top, #22293a 0%, #11141c 62%);
     }
@@ -64,6 +71,138 @@
       color: #eef1f7;
       font-family: inherit;
     }
+  
+    .mobile-controls {
+      display: none;
+      gap: 10px;
+      margin-top: 12px;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .mobile-main-controls {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr 1fr;
+      gap: 10px;
+    }
+
+    .mobile-secondary-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .control-button {
+      min-height: 88px;
+      border: 2px solid #59637a;
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, #343d52 0%, #242b3c 100%);
+      color: #f3f5fa;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        0 6px 0 #171c28,
+        0 10px 24px rgba(0, 0, 0, 0.32);
+      font: 700 34px/1 Consolas, "Courier New", monospace;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .control-button.jump-button {
+      background:
+        linear-gradient(180deg, #a87427 0%, #72501e 100%);
+      border-color: #d3a44e;
+      font-size: 24px;
+      letter-spacing: 1px;
+    }
+
+    .control-button.secondary-button {
+      min-height: 58px;
+      border-radius: 14px;
+      font-size: 17px;
+      color: #dce2ee;
+    }
+
+    .control-button.is-pressed,
+    .control-button:active {
+      transform: translateY(5px);
+      box-shadow:
+        inset 0 2px 8px rgba(0, 0, 0, 0.35),
+        0 1px 0 #171c28;
+      filter: brightness(1.18);
+    }
+
+    @media (hover: none), (pointer: coarse), (max-width: 720px) {
+      body {
+        align-items: start;
+      }
+
+      .game-shell {
+        width: min(900px, 100%);
+      }
+
+      .mobile-controls {
+        display: block;
+      }
+
+      .help {
+        display: none;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .mobile-main-controls {
+        gap: 8px;
+      }
+
+      .mobile-controls {
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .control-button {
+        min-height: 82px;
+        border-radius: 16px;
+        font-size: 32px;
+      }
+
+      .control-button.jump-button {
+        font-size: 21px;
+      }
+
+      .control-button.secondary-button {
+        min-height: 54px;
+        font-size: 15px;
+      }
+    }
+
+    @media (orientation: landscape) and (max-height: 620px) {
+      body {
+        padding-top: 6px;
+        padding-bottom: 6px;
+      }
+
+      .game-shell {
+        width: min(760px, 100%);
+      }
+
+      .control-button {
+        min-height: 64px;
+      }
+
+      .control-button.secondary-button {
+        min-height: 44px;
+      }
+
+      .mobile-controls,
+      .mobile-secondary-controls {
+        margin-top: 6px;
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -80,6 +219,45 @@
       <kbd>Space</kbd> — charge and release jump,
       <kbd>R</kbd> — restart, <kbd>Esc</kbd> — pause.
     </div>
+
+    <section class="mobile-controls" aria-label="Mobile game controls">
+      <div class="mobile-main-controls">
+        <button
+          id="mobile-left"
+          class="control-button"
+          type="button"
+          aria-label="Move left"
+        >&#9664;</button>
+
+        <button
+          id="mobile-jump"
+          class="control-button jump-button"
+          type="button"
+          aria-label="Charge and release jump"
+        >JUMP</button>
+
+        <button
+          id="mobile-right"
+          class="control-button"
+          type="button"
+          aria-label="Move right"
+        >&#9654;</button>
+      </div>
+
+      <div class="mobile-secondary-controls">
+        <button
+          id="mobile-restart"
+          class="control-button secondary-button"
+          type="button"
+        >RESTART</button>
+
+        <button
+          id="mobile-pause"
+          class="control-button secondary-button"
+          type="button"
+        >PAUSE</button>
+      </div>
+    </section>
   </main>
 
   <script>
@@ -1187,6 +1365,9 @@
 
     const keys = new Set();
 
+    let mobileLeftPressed = false;
+    let mobileRightPressed = false;
+
 
     function resetPlayer() {
       player.reset();
@@ -1203,16 +1384,190 @@
     function isLeftPressed() {
       return (
         keys.has("ArrowLeft") ||
-        keys.has("KeyA")
+        keys.has("KeyA") ||
+        mobileLeftPressed
       );
     }
 
     function isRightPressed() {
       return (
         keys.has("ArrowRight") ||
-        keys.has("KeyD")
+        keys.has("KeyD") ||
+        mobileRightPressed
       );
     }
+
+
+
+    function bindHoldButton(button, onPress, onRelease) {
+      const activePointers = new Set();
+
+      function press(event) {
+        event.preventDefault();
+
+        activePointers.add(event.pointerId);
+        button.classList.add("is-pressed");
+
+        try {
+          button.setPointerCapture(event.pointerId);
+        } catch {
+          // Pointer capture is optional.
+        }
+
+        onPress();
+      }
+
+      function release(event) {
+        if (!activePointers.has(event.pointerId)) {
+          return;
+        }
+
+        event.preventDefault();
+        activePointers.delete(event.pointerId);
+
+        if (activePointers.size === 0) {
+          button.classList.remove("is-pressed");
+          onRelease();
+        }
+      }
+
+      button.addEventListener("pointerdown", press);
+      button.addEventListener("pointerup", release);
+      button.addEventListener("pointercancel", release);
+      button.addEventListener("lostpointercapture", release);
+
+      button.addEventListener("contextmenu", event => {
+        event.preventDefault();
+      });
+    }
+
+
+    const mobileLeftButton = document.getElementById(
+      "mobile-left"
+    );
+
+    const mobileRightButton = document.getElementById(
+      "mobile-right"
+    );
+
+    const mobileJumpButton = document.getElementById(
+      "mobile-jump"
+    );
+
+    const mobileRestartButton = document.getElementById(
+      "mobile-restart"
+    );
+
+    const mobilePauseButton = document.getElementById(
+      "mobile-pause"
+    );
+
+
+    bindHoldButton(
+      mobileLeftButton,
+      () => {
+        mobileLeftPressed = true;
+        canvas.focus();
+      },
+      () => {
+        mobileLeftPressed = false;
+      }
+    );
+
+
+    bindHoldButton(
+      mobileRightButton,
+      () => {
+        mobileRightPressed = true;
+        canvas.focus();
+      },
+      () => {
+        mobileRightPressed = false;
+      }
+    );
+
+
+    bindHoldButton(
+      mobileJumpButton,
+      () => {
+        canvas.focus();
+
+        if (!won && !paused) {
+          player.startCharge();
+        }
+      },
+      () => {
+        if (!won && !paused) {
+          player.releaseJump();
+        }
+      }
+    );
+
+
+    mobileRestartButton.addEventListener(
+      "pointerdown",
+      event => {
+        event.preventDefault();
+        mobileRestartButton.classList.add("is-pressed");
+        resetPlayer();
+        canvas.focus();
+      }
+    );
+
+    function releaseRestartButton(event) {
+      event.preventDefault();
+      mobileRestartButton.classList.remove("is-pressed");
+    }
+
+    mobileRestartButton.addEventListener(
+      "pointerup",
+      releaseRestartButton
+    );
+
+    mobileRestartButton.addEventListener(
+      "pointercancel",
+      releaseRestartButton
+    );
+
+
+    mobilePauseButton.addEventListener(
+      "pointerdown",
+      event => {
+        event.preventDefault();
+        mobilePauseButton.classList.add("is-pressed");
+        paused = !paused;
+        mobilePauseButton.textContent = paused
+          ? "RESUME"
+          : "PAUSE";
+        canvas.focus();
+      }
+    );
+
+    function releasePauseButton(event) {
+      event.preventDefault();
+      mobilePauseButton.classList.remove("is-pressed");
+    }
+
+    mobilePauseButton.addEventListener(
+      "pointerup",
+      releasePauseButton
+    );
+
+    mobilePauseButton.addEventListener(
+      "pointercancel",
+      releasePauseButton
+    );
+
+
+    document.addEventListener(
+      "touchmove",
+      event => {
+        if (event.target.closest(".mobile-controls")) {
+          event.preventDefault();
+        }
+      },
+      { passive: false }
+    );
 
 
     window.addEventListener("keydown", event => {
@@ -1232,6 +1587,9 @@
 
       if (event.code === "Escape") {
         paused = !paused;
+        mobilePauseButton.textContent = paused
+          ? "RESUME"
+          : "PAUSE";
         return;
       }
 
@@ -1265,6 +1623,13 @@
 
     window.addEventListener("blur", () => {
       keys.clear();
+
+      mobileLeftPressed = false;
+      mobileRightPressed = false;
+
+      mobileLeftButton.classList.remove("is-pressed");
+      mobileRightButton.classList.remove("is-pressed");
+      mobileJumpButton.classList.remove("is-pressed");
 
       if (player.charging) {
         player.charging = false;

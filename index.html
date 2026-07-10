@@ -90,8 +90,9 @@
     .mobile-secondary-controls {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 10px;
+      gap: 12px;
+      width: min(520px, 78%);
+      margin: 38px auto 0;
     }
 
     .control-button {
@@ -120,10 +121,11 @@
     }
 
     .control-button.secondary-button {
-      min-height: 58px;
+      min-height: 54px;
       border-radius: 14px;
-      font-size: 17px;
-      color: #dce2ee;
+      font-size: 16px;
+      color: #cbd2df;
+      opacity: 0.86;
     }
 
     .control-button.is-pressed,
@@ -163,6 +165,11 @@
         margin-top: 10px;
       }
 
+      .mobile-secondary-controls {
+        width: 82%;
+        margin-top: 34px;
+      }
+
       .control-button {
         min-height: 82px;
         border-radius: 16px;
@@ -197,9 +204,13 @@
         min-height: 44px;
       }
 
-      .mobile-controls,
-      .mobile-secondary-controls {
+      .mobile-controls {
         margin-top: 6px;
+      }
+
+      .mobile-secondary-controls {
+        width: 70%;
+        margin-top: 18px;
       }
     }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Jump King Simple</title>
+  <title>Jump Chicken</title>
   <style>
     :root {
       color-scheme: dark;
@@ -341,6 +341,58 @@
 
 
     // ========================================================
+    // SOUNDS
+    // ========================================================
+    //
+    // Required files:
+    //   sounds/jump.wav
+    //   sounds/power_jump.wav
+    //   sounds/finish.wav
+    //
+    // Browsers allow sound after the first keyboard or touch
+    // interaction with the page.
+    // ========================================================
+
+    const SOUNDS = {
+      jump: new Audio("sounds/jump.wav"),
+      powerJump: new Audio("sounds/power_jump.wav"),
+      finish: new Audio("sounds/finish.wav")
+    };
+
+    for (const sound of Object.values(SOUNDS)) {
+      sound.preload = "auto";
+    }
+
+    SOUNDS.jump.volume = 0.75;
+    SOUNDS.powerJump.volume = 0.85;
+    SOUNDS.finish.volume = 0.9;
+
+
+    function playGameSound(sound) {
+      try {
+        sound.pause();
+        sound.currentTime = 0;
+
+        const playPromise = sound.play();
+
+        if (
+          playPromise &&
+          typeof playPromise.catch === "function"
+        ) {
+          playPromise.catch(() => {
+            // The browser may block sound until the first
+            // keyboard or touch interaction. Ignore safely.
+          });
+        }
+      } catch {
+        // Missing or unsupported audio files must not stop
+        // the game.
+      }
+    }
+
+
+
+    // ========================================================
     // HELPERS
     // ========================================================
 
@@ -671,6 +723,8 @@
 
         this.charging = false;
         this.chargeTime = 0.0;
+
+        playGameSound(SOUNDS.jump);
       }
 
       applySideBounce(hitSide) {
@@ -696,6 +750,8 @@
         this.currentPlatform = null;
 
         this.bounceFlashTimer = 0.18;
+
+        playGameSound(SOUNDS.powerJump);
       }
 
       update(
@@ -1636,10 +1692,12 @@
       );
 
       if (
+        !won &&
         player.onGround &&
         player.currentPlatform === goalPlatform
       ) {
         won = true;
+        playGameSound(SOUNDS.finish);
       }
 
       if (!paused) {

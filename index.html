@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Jump Chicken</title>
+  <title>1000m Hardcore Jump</title>
   <style>
     :root {
       color-scheme: dark;
@@ -341,7 +341,7 @@
 
 
     // ========================================================
-    // SOUNDS
+    // SOUNDS — WEB AUDIO API
     // ========================================================
     //
     // Required files:
@@ -349,47 +349,166 @@
     //   sounds/power_jump.wav
     //   sounds/finish.wav
     //
-    // Browsers allow sound after the first keyboard or touch
-    // interaction with the page.
+    // Files are fetched and decoded once, then replayed from
+    // memory using AudioBufferSourceNode.
     // ========================================================
 
-    const SOUNDS = {
-      jump: new Audio("sounds/jump.wav"),
-      powerJump: new Audio("sounds/power_jump.wav"),
-      finish: new Audio("sounds/finish.wav")
+    const AudioContextClass = (
+      window.AudioContext ||
+      window.webkitAudioContext
+    );
+
+    const audioContext = AudioContextClass
+      ? new AudioContextClass()
+      : null;
+
+    const SOUND_FILES = {
+      jump: "sounds/jump.wav",
+      powerJump: "sounds/power_jump.wav",
+      finish: "sounds/finish.wav"
     };
 
-    for (const sound of Object.values(SOUNDS)) {
-      sound.preload = "auto";
+    const SOUND_VOLUMES = {
+      jump: 0.75,
+      powerJump: 0.85,
+      finish: 0.9
+    };
+
+    const soundBuffers = new Map();
+    const soundLoadPromises = new Map();
+
+    let audioUnlocked = false;
+    let lastPowerJumpSoundTime = -Infinity;
+
+
+    async function loadSound(name, url) {
+      if (!audioContext) {
+        return null;
+      }
+
+      if (soundBuffers.has(name)) {
+        return soundBuffers.get(name);
+      }
+
+      if (soundLoadPromises.has(name)) {
+        return soundLoadPromises.get(name);
+      }
+
+      const loadPromise = (async () => {
+        try {
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error(
+              `Failed to load ${url}: ${response.status}`
+            );
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+
+          const decodedBuffer = await audioContext.decodeAudioData(
+            arrayBuffer
+          );
+
+          soundBuffers.set(name, decodedBuffer);
+          return decodedBuffer;
+
+        } catch (error) {
+          console.warn(
+            `Sound "${name}" could not be loaded.`,
+            error
+          );
+
+          return null;
+        }
+      })();
+
+      soundLoadPromises.set(name, loadPromise);
+      return loadPromise;
     }
 
-    SOUNDS.jump.volume = 0.75;
-    SOUNDS.powerJump.volume = 0.85;
-    SOUNDS.finish.volume = 0.9;
 
-
-    function playGameSound(sound) {
-      try {
-        sound.pause();
-        sound.currentTime = 0;
-
-        const playPromise = sound.play();
-
-        if (
-          playPromise &&
-          typeof playPromise.catch === "function"
-        ) {
-          playPromise.catch(() => {
-            // The browser may block sound until the first
-            // keyboard or touch interaction. Ignore safely.
-          });
-        }
-      } catch {
-        // Missing or unsupported audio files must not stop
-        // the game.
+    function preloadSounds() {
+      for (const [name, url] of Object.entries(SOUND_FILES)) {
+        loadSound(name, url);
       }
     }
 
+
+    async function unlockAudio() {
+      if (!audioContext) {
+        return false;
+      }
+
+      try {
+        if (audioContext.state !== "running") {
+          await audioContext.resume();
+        }
+
+        audioUnlocked = (
+          audioContext.state === "running"
+        );
+
+        return audioUnlocked;
+
+      } catch {
+        return false;
+      }
+    }
+
+
+    function playGameSound(name) {
+      if (!audioContext) {
+        return;
+      }
+
+      if (name === "powerJump") {
+        const now = performance.now();
+
+        if (now - lastPowerJumpSoundTime < 90) {
+          return;
+        }
+
+        lastPowerJumpSoundTime = now;
+      }
+
+      const buffer = soundBuffers.get(name);
+
+      if (!buffer || !audioUnlocked) {
+        return;
+      }
+
+      try {
+        const source = audioContext.createBufferSource();
+        const gain = audioContext.createGain();
+
+        source.buffer = buffer;
+        gain.gain.value = SOUND_VOLUMES[name] ?? 1.0;
+
+        source.connect(gain);
+        gain.connect(audioContext.destination);
+
+        source.start(0);
+
+        source.addEventListener(
+          "ended",
+          () => {
+            source.disconnect();
+            gain.disconnect();
+          },
+          { once: true }
+        );
+
+      } catch (error) {
+        console.warn(
+          `Sound "${name}" could not be played.`,
+          error
+        );
+      }
+    }
+
+
+    preloadSounds();
 
 
     // ========================================================
@@ -724,7 +843,7 @@
         this.charging = false;
         this.chargeTime = 0.0;
 
-        playGameSound(SOUNDS.jump);
+        playGameSound("jump");
       }
 
       applySideBounce(hitSide) {
@@ -751,7 +870,7 @@
 
         this.bounceFlashTimer = 0.18;
 
-        playGameSound(SOUNDS.powerJump);
+        playGameSound("powerJump");
       }
 
       update(
@@ -921,7 +1040,8 @@
 
           if (
             this.vy >= 0 &&
-            oldRect.y + oldRect.h <= b.y
+            oldRect.y < b.y &&
+            newRect.y + newRect.h >= b.y
           ) {
             this.y = b.y - PLAYER_HEIGHT;
             this.vy = 0.0;
@@ -959,7 +1079,7 @@
 
             const crossedTop = (
               this.vy >= 0 &&
-              oldRect.y + oldRect.h <= p.y &&
+              oldRect.y < p.y &&
               newRect.y + newRect.h >= p.y
             );
 
@@ -1281,6 +1401,7 @@
 
     let spawnX;
     let spawnY;
+    let spawnPlatform = null;
 
     if (DEBUG_START_HEIGHT === null) {
       spawnX = (
@@ -1292,6 +1413,9 @@
         START_GROUND_Y -
         PLAYER_HEIGHT
       );
+
+      spawnPlatform = platforms[0];
+
     } else {
       const targetY = heightToWorldY(
         DEBUG_START_HEIGHT
@@ -1309,7 +1433,7 @@
         );
       }
 
-      const spawnPlatform = candidates.reduce(
+      spawnPlatform = candidates.reduce(
         (best, platform) => {
           const bestDistance = Math.abs(
             best.rect.x + best.rect.w / 2 -
@@ -1341,6 +1465,11 @@
 
     const player = new Player(spawnX, spawnY);
 
+    // Start in a stable grounded state instead of waiting for
+    // the first physics frame to rediscover the platform.
+    player.onGround = true;
+    player.currentPlatform = spawnPlatform;
+
     let cameraY = Math.min(
       spawnY - SCREEN_HEIGHT * 0.62,
       0.0
@@ -1370,6 +1499,9 @@
 
     function resetPlayer() {
       player.reset();
+
+      player.onGround = true;
+      player.currentPlatform = spawnPlatform;
 
       cameraY = Math.min(
         player.y - SCREEN_HEIGHT * 0.62,
@@ -1403,6 +1535,7 @@
 
       function press(event) {
         event.preventDefault();
+        unlockAudio();
 
         activePointers.add(event.pointerId);
         button.classList.add("is-pressed");
@@ -1507,6 +1640,7 @@
       "pointerdown",
       event => {
         event.preventDefault();
+        unlockAudio();
         mobileRestartButton.classList.add("is-pressed");
         resetPlayer();
         canvas.focus();
@@ -1533,6 +1667,7 @@
       "pointerdown",
       event => {
         event.preventDefault();
+        unlockAudio();
         mobilePauseButton.classList.add("is-pressed");
         paused = !paused;
         mobilePauseButton.textContent = paused
@@ -1570,6 +1705,8 @@
 
 
     window.addEventListener("keydown", event => {
+      unlockAudio();
+
       if (
         event.code === "ArrowLeft" ||
         event.code === "ArrowRight" ||
@@ -1659,13 +1796,25 @@
       dt = Math.min(dt, 1.0 / 30.0);
 
       if (!paused && !won) {
-        player.update(
-          dt,
-          platforms,
-          blocks,
-          isLeftPressed(),
-          isRightPressed()
-        );
+        const physicsStep = 1.0 / 120.0;
+        let remainingTime = dt;
+
+        while (remainingTime > 0.0) {
+          const step = Math.min(
+            physicsStep,
+            remainingTime
+          );
+
+          player.update(
+            step,
+            platforms,
+            blocks,
+            isLeftPressed(),
+            isRightPressed()
+          );
+
+          remainingTime -= step;
+        }
       }
 
       const playerFeetY = (
@@ -1697,7 +1846,7 @@
         player.currentPlatform === goalPlatform
       ) {
         won = true;
-        playGameSound(SOUNDS.finish);
+        playGameSound("finish");
       }
 
       if (!paused) {

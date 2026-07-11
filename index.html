@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Jump Chicken</title>
+  <title>Jump Chicken v0.0.10</title>
   <style>
     :root {
       color-scheme: dark;
@@ -341,7 +341,7 @@
 
 
     // ========================================================
-    // SOUNDS — WEB AUDIO API
+    // SOUNDS — MOBILE-SAFE WEB AUDIO API
     // ========================================================
     //
     // Required files:
@@ -349,18 +349,15 @@
     //   sounds/power_jump.wav
     //   sounds/finish.wav
     //
-    // Files are fetched and decoded once, then replayed from
-    // memory using AudioBufferSourceNode.
+    // Raw files are downloaded in advance, but AudioContext is
+    // created only after a real keyboard/touch interaction.
+    // This is more reliable on iOS Safari and mobile Chrome.
     // ========================================================
 
     const AudioContextClass = (
       window.AudioContext ||
       window.webkitAudioContext
     );
-
-    const audioContext = AudioContextClass
-      ? new AudioContextClass()
-      : null;
 
     const SOUND_FILES = {
       jump: "sounds/jump.wav",
@@ -374,29 +371,30 @@
       finish: 0.9
     };
 
-    const soundBuffers = new Map();
-    const soundLoadPromises = new Map();
-
+    let audioContext = null;
     let audioUnlocked = false;
     let lastPowerJumpSoundTime = -Infinity;
 
+    const rawSoundData = new Map();
+    const rawSoundPromises = new Map();
+    const soundBuffers = new Map();
+    const decodePromises = new Map();
 
-    async function loadSound(name, url) {
-      if (!audioContext) {
-        return null;
+
+    async function fetchSoundFile(name, url) {
+      if (rawSoundData.has(name)) {
+        return rawSoundData.get(name);
       }
 
-      if (soundBuffers.has(name)) {
-        return soundBuffers.get(name);
+      if (rawSoundPromises.has(name)) {
+        return rawSoundPromises.get(name);
       }
 
-      if (soundLoadPromises.has(name)) {
-        return soundLoadPromises.get(name);
-      }
-
-      const loadPromise = (async () => {
+      const promise = (async () => {
         try {
-          const response = await fetch(url);
+          const response = await fetch(url, {
+            cache: "force-cache"
+          });
 
           if (!response.ok) {
             throw new Error(
@@ -404,18 +402,13 @@
             );
           }
 
-          const arrayBuffer = await response.arrayBuffer();
-
-          const decodedBuffer = await audioContext.decodeAudioData(
-            arrayBuffer
-          );
-
-          soundBuffers.set(name, decodedBuffer);
-          return decodedBuffer;
+          const data = await response.arrayBuffer();
+          rawSoundData.set(name, data);
+          return data;
 
         } catch (error) {
           console.warn(
-            `Sound "${name}" could not be loaded.`,
+            `Sound file "${name}" could not be loaded.`,
             error
           );
 
@@ -423,24 +416,32 @@
         }
       })();
 
-      soundLoadPromises.set(name, loadPromise);
-      return loadPromise;
+      rawSoundPromises.set(name, promise);
+      return promise;
     }
 
 
-    function preloadSounds() {
+    function preloadSoundFiles() {
       for (const [name, url] of Object.entries(SOUND_FILES)) {
-        loadSound(name, url);
+        fetchSoundFile(name, url);
       }
     }
 
 
     async function unlockAudio() {
-      if (!audioContext) {
+      if (!AudioContextClass) {
         return false;
       }
 
       try {
+        // Creating AudioContext inside a user gesture is
+        // important for mobile Safari.
+        if (!audioContext) {
+          audioContext = new AudioContextClass({
+            latencyHint: "interactive"
+          });
+        }
+
         if (audioContext.state !== "running") {
           await audioContext.resume();
         }
@@ -451,17 +452,79 @@
 
         return audioUnlocked;
 
-      } catch {
+      } catch (error) {
+        console.warn(
+          "Web Audio could not be unlocked.",
+          error
+        );
+
         return false;
       }
     }
 
 
-    function playGameSound(name) {
+    async function decodeSound(name) {
       if (!audioContext) {
+        return null;
+      }
+
+      if (soundBuffers.has(name)) {
+        return soundBuffers.get(name);
+      }
+
+      if (decodePromises.has(name)) {
+        return decodePromises.get(name);
+      }
+
+      const promise = (async () => {
+        const rawData = await fetchSoundFile(
+          name,
+          SOUND_FILES[name]
+        );
+
+        if (!rawData || !audioContext) {
+          return null;
+        }
+
+        try {
+          // Use a copy because some browser implementations
+          // detach the supplied ArrayBuffer while decoding.
+          const decoded = await audioContext.decodeAudioData(
+            rawData.slice(0)
+          );
+
+          soundBuffers.set(name, decoded);
+          return decoded;
+
+        } catch (error) {
+          console.warn(
+            `Sound "${name}" could not be decoded.`,
+            error
+          );
+
+          return null;
+        }
+      })();
+
+      decodePromises.set(name, promise);
+      return promise;
+    }
+
+
+    async function prepareDecodedSounds() {
+      const unlocked = await unlockAudio();
+
+      if (!unlocked) {
         return;
       }
 
+      for (const name of Object.keys(SOUND_FILES)) {
+        decodeSound(name);
+      }
+    }
+
+
+    async function playGameSound(name) {
       if (name === "powerJump") {
         const now = performance.now();
 
@@ -472,13 +535,23 @@
         lastPowerJumpSoundTime = now;
       }
 
-      const buffer = soundBuffers.get(name);
+      const unlocked = await unlockAudio();
 
-      if (!buffer || !audioUnlocked) {
+      if (!unlocked || !audioContext) {
+        return;
+      }
+
+      const buffer = await decodeSound(name);
+
+      if (!buffer || !audioContext) {
         return;
       }
 
       try {
+        if (audioContext.state !== "running") {
+          await audioContext.resume();
+        }
+
         const source = audioContext.createBufferSource();
         const gain = audioContext.createGain();
 
@@ -508,7 +581,7 @@
     }
 
 
-    preloadSounds();
+    preloadSoundFiles();
 
 
     // ========================================================
@@ -1034,30 +1107,44 @@
         for (const block of blocks) {
           const b = block.rect;
 
-          if (!rectsOverlap(newRect, b)) {
+          const horizontalOverlap = (
+            newRect.x + newRect.w > b.x &&
+            newRect.x < b.x + b.w
+          );
+
+          if (!horizontalOverlap) {
             continue;
           }
 
-          if (
+          const crossedBlockTop = (
             this.vy >= 0 &&
-            oldRect.y < b.y &&
+            oldRect.y + oldRect.h <= b.y &&
             newRect.y + newRect.h >= b.y
-          ) {
+          );
+
+          if (crossedBlockTop) {
             this.y = b.y - PLAYER_HEIGHT;
             this.vy = 0.0;
             this.onGround = true;
+            this.currentPlatform = block;
 
             newRect = this.rect;
             break;
           }
 
-          if (
+          const crossedBlockUnderside = (
             this.vy < 0 &&
-            oldRect.y >= b.y + b.h
-          ) {
+            oldRect.y >= b.y + b.h &&
+            newRect.y <= b.y + b.h
+          );
+
+          if (crossedBlockUnderside) {
             this.y = b.y + b.h;
             this.vy = Math.abs(this.vy)
               * CEILING_BOUNCE_FACTOR;
+
+            this.onGround = false;
+            this.currentPlatform = null;
 
             newRect = this.rect;
             break;
@@ -1535,7 +1622,7 @@
 
       function press(event) {
         event.preventDefault();
-        unlockAudio();
+        prepareDecodedSounds();
 
         activePointers.add(event.pointerId);
         button.classList.add("is-pressed");
@@ -1640,7 +1727,7 @@
       "pointerdown",
       event => {
         event.preventDefault();
-        unlockAudio();
+        prepareDecodedSounds();
         mobileRestartButton.classList.add("is-pressed");
         resetPlayer();
         canvas.focus();
@@ -1667,7 +1754,7 @@
       "pointerdown",
       event => {
         event.preventDefault();
-        unlockAudio();
+        prepareDecodedSounds();
         mobilePauseButton.classList.add("is-pressed");
         paused = !paused;
         mobilePauseButton.textContent = paused
@@ -1705,7 +1792,7 @@
 
 
     window.addEventListener("keydown", event => {
-      unlockAudio();
+      prepareDecodedSounds();
 
       if (
         event.code === "ArrowLeft" ||

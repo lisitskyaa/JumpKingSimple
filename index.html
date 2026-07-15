@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Jump Chicken v0.0.10</title>
+  <title>Jump Chicken v0.0.19</title>
   <style>
     :root {
       color-scheme: dark;
@@ -223,12 +223,12 @@
       width="900"
       height="700"
       tabindex="0"
-      aria-label="1000m Hardcore Jump game"
+      aria-label="Jump Chicken 2000 meter game"
     ></canvas>
     <div class="help">
       <kbd>A</kbd>/<kbd>D</kbd> or arrow keys — run and face,
       <kbd>Space</kbd> — hold to charge, release to jump,
-      <kbd>R</kbd> — restart, <kbd>Esc</kbd> — pause.
+      <kbd>R</kbd> — restart level, <kbd>Esc</kbd> — pause.
     </div>
 
     <section class="mobile-controls" aria-label="Mobile game controls">
@@ -283,12 +283,12 @@
 
     const WORLD_WIDTH = 900;
     const START_GROUND_Y = 620;
-    const MAX_HEIGHT_METERS = 1000;
+    const MAX_HEIGHT_METERS = 2000;
 
     // null = normal start.
     // Example: 386 and 430 starts on the left 386 m platform.
-    const DEBUG_START_HEIGHT = null;
-    const DEBUG_START_X = 200;
+    const DEBUG_START_HEIGHT = null; //1850; //1595; //1510;
+    const DEBUG_START_X = 100;
 
     const GRAVITY = 1800.0;
 
@@ -434,6 +434,16 @@
       }
 
       try {
+        // Use the media playback session on supported iOS versions
+        // so Web Audio is not muted by the hardware silent switch.
+        if ("audioSession" in navigator) {
+          try {
+            navigator.audioSession.type = "playback";
+          } catch {
+            // Unsupported or read-only implementations are safe.
+          }
+        }
+
         // Creating AudioContext inside a user gesture is
         // important for mobile Safari.
         if (!audioContext) {
@@ -751,12 +761,933 @@
           ctx.lineTo(drawRect.x + drawRect.w - 6, y);
           ctx.stroke();
         }
+
+        ctx.save();
+        ctx.globalAlpha = 0.34;
+        ctx.strokeStyle = COLORS.bounce;
+        ctx.lineWidth = 2;
+
+        for (
+          let y = drawRect.y + 28;
+          y < drawRect.y + drawRect.h - 12;
+          y += 54
+        ) {
+          ctx.beginPath();
+          ctx.moveTo(drawRect.x + 7, y - 7);
+          ctx.lineTo(drawRect.x + 15, y);
+          ctx.lineTo(drawRect.x + 7, y + 7);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(drawRect.x + drawRect.w - 7, y - 7);
+          ctx.lineTo(drawRect.x + drawRect.w - 15, y);
+          ctx.lineTo(drawRect.x + drawRect.w - 7, y + 7);
+          ctx.stroke();
+        }
+
+        ctx.restore();
       }
     }
+    // Level 2 keeps the user's hand-built geometry through 1417 m.
+    // The continuation uses traverses, rebound pipes, drops and decoys.
+    const LEVEL_DATA = [
+  [
+    650,
+    12,
+    240
+  ],
+  [
+    400,
+    25,
+    220
+  ],
+  [
+    180,
+    38,
+    210
+  ],
+  [
+    440,
+    51,
+    190
+  ],
+  [
+    690,
+    65,
+    190
+  ],
+  [
+    470,
+    79,
+    180
+  ],
+  [
+    220,
+    90,
+    220
+  ],
+  [
+    450,
+    100,
+    300
+  ],
+  [
+    190,
+    112,
+    180
+  ],
+  [
+    120,
+    126,
+    120
+  ],
+  [
+    320,
+    126,
+    105
+  ],
+  [
+    520,
+    126,
+    95
+  ],
+  [
+    720,
+    126,
+    90
+  ],
+  [
+    800,
+    142,
+    100
+  ],
+  [
+    610,
+    156,
+    95
+  ],
+  [
+    380,
+    170,
+    90
+  ],
+  [
+    160,
+    184,
+    100
+  ],
+  [
+    430,
+    200,
+    280
+  ],
+  [
+    680,
+    214,
+    150
+  ],
+  [
+    785,
+    226,
+    115
+  ],
+  [
+    540,
+    239,
+    110
+  ],
+  [
+    290,
+    252,
+    105
+  ],
+  [
+    90,
+    266,
+    115
+  ],
+  [
+    340,
+    279,
+    95
+  ],
+  [
+    590,
+    291,
+    90
+  ],
+  [
+    450,
+    300,
+    260
+  ],
+  [
+    720,
+    314,
+    150
+  ],
+  [
+    650,
+    345,
+    105
+  ],
+  [
+    410,
+    358,
+    90
+  ],
+  [
+    180,
+    372,
+    82
+  ],
+  [
+    430,
+    386,
+    88
+  ],
+  [
+    690,
+    386,
+    180
+  ],
+  [
+    500,
+    400,
+    230
+  ],
+  [
+    740,
+    413,
+    130
+  ],
+  [
+    520,
+    425,
+    85
+  ],
+  [
+    280,
+    438,
+    80
+  ],
+  [
+    90,
+    450,
+    78
+  ],
+  [
+    335,
+    462,
+    75
+  ],
+  [
+    585,
+    474,
+    72
+  ],
+  [
+    790,
+    486,
+    88
+  ],
+  [
+    520,
+    500,
+    240
+  ],
+  [
+    300,
+    512,
+    190
+  ],
+  [
+    120,
+    526,
+    110
+  ],
+  [
+    300,
+    526,
+    95
+  ],
+  [
+    490,
+    526,
+    85
+  ],
+  [
+    675,
+    526,
+    80
+  ],
+  [
+    815,
+    526,
+    72
+  ],
+  [
+    780,
+    542,
+    90
+  ],
+  [
+    560,
+    556,
+    82
+  ],
+  [
+    340,
+    570,
+    76
+  ],
+  [
+    150,
+    584,
+    82
+  ],
+  [
+    550,
+    600,
+    220
+  ],
+  [
+    780,
+    614,
+    110
+  ],
+  [
+    530,
+    628,
+    90
+  ],
+  [
+    280,
+    642,
+    85
+  ],
+  [
+    80,
+    655,
+    90
+  ],
+  [
+    330,
+    668,
+    78
+  ],
+  [
+    580,
+    681,
+    74
+  ],
+  [
+    800,
+    694,
+    70
+  ],
+  [
+    560,
+    700,
+    200
+  ],
+  [
+    340,
+    710,
+    120
+  ],
+  [
+    150,
+    718,
+    135
+  ],
+  [
+    250,
+    749,
+    95
+  ],
+  [
+    500,
+    762,
+    80
+  ],
+  [
+    760,
+    775,
+    72
+  ],
+  [
+    540,
+    788,
+    68
+  ],
+  [
+    500,
+    800,
+    180
+  ],
+  [
+    745,
+    812,
+    95
+  ],
+  [
+    520,
+    825,
+    72
+  ],
+  [
+    285,
+    838,
+    68
+  ],
+  [
+    80,
+    850,
+    70
+  ],
+  [
+    325,
+    862,
+    64
+  ],
+  [
+    570,
+    874,
+    64
+  ],
+  [
+    810,
+    886,
+    68
+  ],
+  [
+    555,
+    900,
+    170
+  ],
+  [
+    160,
+    912,
+    64
+  ],
+  [
+    360,
+    912,
+    66
+  ],
+  [
+    560,
+    912,
+    72
+  ],
+  [
+    760,
+    912,
+    85
+  ],
+  [
+    100,
+    930,
+    75
+  ],
+  [
+    350,
+    943,
+    66
+  ],
+  [
+    610,
+    956,
+    62
+  ],
+  [
+    820,
+    968,
+    18
+  ],
+  [
+    570,
+    980,
+    60
+  ],
+  [
+    320,
+    990,
+    18
+  ],
+  [
+    450,
+    1000,
+    260
+  ],
+  [
+    450,
+    1120,
+    180
+  ],
+  [
+    100,
+    1110,
+    100
+  ],
+  [
+    800,
+    1110,
+    100
+  ],
+  [
+    800,
+    1185,
+    100
+  ],
+  [
+    795,
+    1200,
+    90
+  ],
+  [
+    550,
+    1215,
+    100
+  ],
+  [
+    350,
+    1225,
+    500
+  ],
+  [
+    840,
+    1210,
+    120
+  ],
+  [
+    390,
+    1215,
+    20
+  ],
+  [
+    125,
+    1215,
+    150
+  ],
+  [
+    50,
+    1235,
+    100
+  ],
+  [
+    310,
+    1215,
+    20
+  ],
+  [
+    280,
+    1245,
+    40
+  ],
+  [
+    560,
+    1275,
+    40
+  ],
+  [
+    420,
+    1260,
+    40
+  ],
+  [
+    850,
+    1275,
+    100
+  ],
+  [
+    450,
+    1310,
+    100
+  ],
+  [
+    870,
+    1320,
+    60
+  ],
+  [
+    660,
+    1392,
+    120
+  ],
+  [
+    895,
+    1323,
+    10
+  ],
+  [
+    485,
+    1407,
+    670
+  ],
+  [
+    500,
+    1380,
+    100
+  ],
+  [
+    310,
+    1390,
+    80
+  ],
+  [
+    180,
+    1380,
+    60
+  ],
+  [
+    20,
+    1395,
+    40
+  ],
+  [
+    200,
+    1417,
+    100
+  ],
+  [
+    420,
+    1450,
+    140
+  ],
+  [
+    650,
+    1450,
+    70
+  ],
+  [
+    830,
+    1450,
+    50
+  ],
+  [
+    700,
+    1470,
+    90
+  ],
+  [
+    470,
+    1485,
+    80
+  ],
+  [
+    200,
+    1500,
+    60
+  ],
+  [
+    490,
+    1510,
+    120
+  ],
+  [
+    700,
+    1522,
+    90
+  ],
+  [
+    850,
+    1535,
+    70
+  ],
+  [
+    690,
+    1535,
+    50
+  ],
+  [
+    530,
+    1535,
+    50
+  ],
+  [
+    370,
+    1535,
+    50
+  ],
+  [
+    210,
+    1535,
+    50
+  ],
+  [
+    70,
+    1535,
+    60
+  ],
+  [
+    500,
+    1590,
+    100
+  ],
+  [
+    740,
+    1605,
+    80
+  ],
+  [
+    450,
+    1615,
+    160
+  ],
+  [
+    450,
+    1620,
+    90
+  ],
+  [
+    280,
+    1815,
+    90
+  ],
+  [
+    752.5,
+    1815,
+    95
+  ],
+  [
+    100,
+    1835,
+    80
+  ],
+  [
+    100,
+    1865,
+    80
+  ],
+  [
+    500,
+    1885,
+    60
+  ],
+  [
+    730,
+    1905,
+    60
+  ],
+  [
+    500,
+    1918,
+    60
+  ],
+  [
+    287.5,
+    1930,
+    75
+  ],
+  [
+    450,
+    2000,
+    260
+  ],
+  [
+    450,
+    1990,
+    180
+  ],
+  [
+    280,
+    1765,
+    90
+  ],
+  [
+    450,
+    1800,
+    160
+  ],
+  [
+    327,
+    1700,
+    134
+  ],
+  [
+    650,
+    1715,
+    100
+  ],
+  [
+    865,
+    1735,
+    70
+  ],
+  [
+    150,
+    1632,
+    100
+  ],
+  [
+    40,
+    1670,
+    80
+  ],
+  [
+    40,
+    1705,
+    80
+  ],
+  [
+    250,
+    1725,
+    80
+  ],
+  [
+    80,
+    1740,
+    80
+  ],
+  [
+    717.5,
+    1980,
+    25
+  ]
+];
 
-
-    const LEVEL_DATA = [[650, 12, 240], [400, 25, 220], [180, 38, 210], [440, 51, 190], [690, 65, 190], [470, 79, 180], [220, 90, 220], [450, 100, 300], [190, 112, 180], [120, 126, 120], [320, 126, 105], [520, 126, 95], [720, 126, 90], [800, 142, 100], [610, 156, 95], [380, 170, 90], [160, 184, 100], [430, 200, 280], [680, 214, 150], [785, 226, 115], [540, 239, 110], [290, 252, 105], [90, 266, 115], [340, 279, 95], [590, 291, 90], [450, 300, 260], [720, 314, 150], [650, 345, 105], [410, 358, 90], [180, 372, 82], [430, 386, 88], [690, 386, 180], [500, 400, 230], [740, 413, 130], [520, 425, 85], [280, 438, 80], [90, 450, 78], [335, 462, 75], [585, 474, 72], [790, 486, 88], [520, 500, 240], [300, 512, 190], [120, 526, 110], [300, 526, 95], [490, 526, 85], [675, 526, 80], [815, 526, 72], [780, 542, 90], [560, 556, 82], [340, 570, 76], [150, 584, 82], [550, 600, 220], [780, 614, 110], [530, 628, 90], [280, 642, 85], [80, 655, 90], [330, 668, 78], [580, 681, 74], [800, 694, 70], [560, 700, 200], [340, 710, 120], [150, 718, 135], [250, 749, 95], [500, 762, 80], [760, 775, 72], [540, 788, 68], [500, 800, 180], [745, 812, 95], [520, 825, 72], [285, 838, 68], [80, 850, 70], [325, 862, 64], [570, 874, 64], [810, 886, 68], [555, 900, 170], [760, 912, 85], [560, 912, 72], [360, 912, 66], [160, 912, 64], [100, 930, 75], [350, 943, 66], [610, 956, 62], [820, 968, 18], [570, 980, 60], [320, 990, 18], [450, 1000, 260]];
-    const BLOCK_DATA = [[840, 300, 378, 40], [20, 700, 782, 42], [430, 844, 856, 48]];
+const BLOCK_DATA = [
+  [
+    840,
+    300,
+    378,
+    40
+  ],
+  [
+    20,
+    700,
+    782,
+    42
+  ],
+  [
+    430,
+    844,
+    856,
+    48
+  ],
+  [
+    360,
+    1010,
+    1110,
+    40
+  ],
+  [
+    500,
+    1010,
+    1110,
+    40
+  ],
+  [
+    200,
+    1135,
+    1145,
+    20
+  ],
+  [
+    350,
+    1145,
+    1155,
+    20
+  ],
+  [
+    500,
+    1155,
+    1165,
+    20
+  ],
+  [
+    650,
+    1165,
+    1175,
+    20
+  ],
+  [
+    580,
+    1225,
+    1275,
+    20
+  ],
+  [
+    780,
+    1210,
+    1275,
+    20
+  ],
+  [
+    680,
+    1290,
+    1300,
+    20
+  ],
+  [
+    700,
+    1335,
+    1390,
+    20
+  ],
+  [
+    800,
+    1345,
+    1405,
+    20
+  ],
+  [
+    150,
+    1417,
+    1500,
+    20
+  ],
+  [
+    150,
+    1555,
+    1575,
+    600
+  ],
+  [
+    360,
+    1630,
+    1700,
+    35
+  ],
+  [
+    505,
+    1630,
+    1720,
+    35
+  ],
+  [
+    650,
+    1835,
+    1870,
+    220
+  ],
+  [
+    280,
+    1830,
+    1885,
+    40
+  ],
+  [
+    220,
+    1940,
+    1980,
+    30
+  ],
+  [
+    360,
+    1940,
+    1990,
+    30
+  ],
+  [
+    450,
+    1755,
+    1780,
+    350
+  ]
+];
 
 
     function createLevel() {
@@ -1334,7 +2265,18 @@
       if (height < 700) return "THE SAW";
       if (height < 800) return "LEFT WALL REBOUND";
       if (height < 900) return "PUNISHMENT ZONE";
-      return "FINAL SIDEWAYS GAUNTLET";
+      if (height < 1000) return "FINAL SIDEWAYS GAUNTLET";
+
+      if (height < 1120) return "THE FIRST CHIMNEY";
+      if (height < 1215) return "STEPPING STONES";
+      if (height < 1310) return "THE MAZE";
+      if (height < 1417) return "TWIN TOWERS";
+      if (height < 1510) return "KICKBACK RUN";
+      if (height < 1620) return "LOW ROAD";
+      if (height < 1700) return "BOUNCE CHIMNEY";
+      if (height < 1800) return "DROP SWITCH";
+      if (height < 1930) return "FALSE FORK";
+      return "PINBALL CROWN";
     }
 
 
@@ -1364,7 +2306,17 @@
     ) {
       drawText(
         ctx,
-        `${Math.round(currentHeight)} / 1000 m`,
+        currentHeight < 1000 ? "LEVEL 1" : "LEVEL 2",
+        20,
+        20,
+        20,
+        COLORS.yellow,
+        true
+      );
+
+      drawText(
+        ctx,
+        `${Math.round(currentHeight)} / 2000 m`,
         SCREEN_WIDTH - 20,
         20,
         26,
@@ -1486,6 +2438,14 @@
       platform => platform.isGoal
     );
 
+    const levelTwoCheckpoint = platforms.find(
+      platform => (
+        !platform.isGoal &&
+        Math.abs(platform.rect.y - heightToWorldY(1000)) <= 2 &&
+        platform.rect.w === 260
+      )
+    );
+
     let spawnX;
     let spawnY;
     let spawnPlatform = null;
@@ -1577,6 +2537,10 @@
 
     let won = false;
     let paused = false;
+    let levelTwoCheckpointActive = (
+      DEBUG_START_HEIGHT !== null && DEBUG_START_HEIGHT >= 1000
+    );
+    let levelBannerTimer = 0.0;
 
     const keys = new Set();
 
@@ -1928,12 +2892,30 @@
       );
 
       if (
+        !levelTwoCheckpointActive &&
+        player.onGround &&
+        player.currentPlatform === levelTwoCheckpoint
+      ) {
+        levelTwoCheckpointActive = true;
+        spawnPlatform = levelTwoCheckpoint;
+        player.startX = (
+          levelTwoCheckpoint.rect.x + levelTwoCheckpoint.rect.w / 2 - PLAYER_WIDTH / 2
+        );
+        player.startY = levelTwoCheckpoint.rect.y - PLAYER_HEIGHT;
+        levelBannerTimer = 2.2;
+      }
+
+      if (
         !won &&
         player.onGround &&
         player.currentPlatform === goalPlatform
       ) {
         won = true;
         playGameSound("finish");
+      }
+
+      if (levelBannerTimer > 0.0 && !paused) {
+        levelBannerTimer = Math.max(0.0, levelBannerTimer - dt);
       }
 
       if (!paused) {
@@ -1974,11 +2956,19 @@
         highestHeight
       );
 
+      if (levelBannerTimer > 0.0 && !won) {
+        const alpha = clamp(levelBannerTimer / 0.35, 0.0, 1.0);
+        ctx.fillStyle = `rgba(0, 0, 0, ${0.55 * alpha})`;
+        ctx.fillRect(SCREEN_WIDTH / 2 - 235, 122, 470, 104);
+        drawText(ctx, "LEVEL 2", SCREEN_WIDTH / 2, 138, 38, COLORS.yellow, true, "center");
+        drawText(ctx, "THE UPPER TOWER", SCREEN_WIDTH / 2, 184, 18, COLORS.white, true, "center");
+      }
+
       if (won) {
         drawCenteredOverlay(
           ctx,
-          "1000 METERS!",
-          "You reached the summit",
+          "2000 METERS!",
+          "You conquered both levels",
           "Press R to restart",
           COLORS.green
         );
@@ -1987,7 +2977,7 @@
           ctx,
           "PAUSED",
           "Press Esc to continue",
-          "R restarts from the selected spawn point",
+          "R restarts from the last checkpoint",
           COLORS.yellow
         );
       }

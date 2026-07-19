@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Jump Chicken v0.0.19</title>
+  <title>Jump Chicken v0.0.20 — Procedural Pixel Art</title>
   <style>
     :root {
       color-scheme: dark;
@@ -48,10 +48,14 @@
       width: 100%;
       height: auto;
       aspect-ratio: 9 / 7;
-      border: 1px solid #3a4052;
-      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
-      background: #1b202e;
+      border: 4px solid #2b2634;
+      box-shadow:
+        0 0 0 4px #68583f,
+        0 18px 60px rgba(0, 0, 0, 0.45);
+      background: #182033;
       outline: none;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
     }
 
     .help {
@@ -223,7 +227,7 @@
       width="900"
       height="700"
       tabindex="0"
-      aria-label="Jump Chicken 2000 meter game"
+      aria-label="Jump Chicken procedural pixel-art game"
     ></canvas>
     <div class="help">
       <kbd>A</kbd>/<kbd>D</kbd> or arrow keys — run and face,
@@ -652,6 +656,1285 @@
     // LEVEL GEOMETRY
     // ========================================================
 
+
+    // ========================================================
+    // PROCEDURAL PIXEL ART — NO EXTERNAL IMAGE FILES
+    // ========================================================
+
+    const PIXEL_ART = {
+      outline: "#3a2a27",
+      darkOutline: "#201c25",
+
+      chickBody: "#f6c84b",
+      chickLight: "#ffe786",
+      chickShadow: "#c9822d",
+      chickDeepShadow: "#915020",
+      chickComb: "#da5547",
+      chickBeak: "#ef8129",
+      chickEye: "#17151b",
+      chickEyeLight: "#fff9dd",
+      chickLeg: "#d76b27",
+
+      grassLight: "#b4cf71",
+      grass: "#769b4b",
+      grassDark: "#466036",
+      soilLight: "#866846",
+      soil: "#654b35",
+      soilDark: "#3e302a",
+
+      metalLight: "#a2a8b8",
+      metal: "#656a79",
+      metalDark: "#3b3d49",
+      metalDeep: "#242630",
+      bolt: "#d4d8e0",
+      bounceLight: "#ffe57b",
+      bounceDark: "#c98a2e",
+
+      goalLight: "#fff078",
+      goal: "#d7a939",
+      goalDark: "#7d5622",
+
+      uiPanel: "rgba(20, 22, 31, 0.86)",
+      uiBorder: "#847253",
+      uiInner: "#3b3540"
+    };
+
+
+    function pixelRect(
+      ctx,
+      x,
+      y,
+      width,
+      height,
+      color
+    ) {
+      ctx.fillStyle = color;
+      ctx.fillRect(
+        Math.round(x),
+        Math.round(y),
+        Math.round(width),
+        Math.round(height)
+      );
+    }
+
+
+    function deterministicHash(x, y = 0) {
+      let value = (
+        Math.imul(Math.floor(x), 374761393) +
+        Math.imul(Math.floor(y), 668265263)
+      ) | 0;
+
+      value = Math.imul(
+        value ^ (value >>> 13),
+        1274126177
+      );
+
+      return (
+        (value ^ (value >>> 16)) >>> 0
+      ) / 4294967295;
+    }
+
+
+    function drawPixelPanel(
+      ctx,
+      x,
+      y,
+      width,
+      height
+    ) {
+      pixelRect(
+        ctx,
+        x,
+        y,
+        width,
+        height,
+        PIXEL_ART.darkOutline
+      );
+
+      pixelRect(
+        ctx,
+        x + 3,
+        y + 3,
+        width - 6,
+        height - 6,
+        PIXEL_ART.uiBorder
+      );
+
+      pixelRect(
+        ctx,
+        x + 6,
+        y + 6,
+        width - 12,
+        height - 12,
+        PIXEL_ART.uiPanel
+      );
+
+      pixelRect(
+        ctx,
+        x + 9,
+        y + 9,
+        width - 18,
+        2,
+        PIXEL_ART.uiInner
+      );
+    }
+
+
+    function drawPixelPlatform(
+      ctx,
+      rect,
+      isGoal
+    ) {
+      const x = Math.round(rect.x);
+      const y = Math.round(rect.y);
+      const width = Math.round(rect.w);
+      const height = Math.round(rect.h);
+
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      ctx.clip();
+
+      const outline = isGoal
+        ? PIXEL_ART.goalDark
+        : PIXEL_ART.outline;
+
+      const topLight = isGoal
+        ? PIXEL_ART.goalLight
+        : PIXEL_ART.grassLight;
+
+      const topMain = isGoal
+        ? PIXEL_ART.goal
+        : PIXEL_ART.grass;
+
+      const topDark = isGoal
+        ? PIXEL_ART.goalDark
+        : PIXEL_ART.grassDark;
+
+      const bodyLight = isGoal
+        ? "#b47e29"
+        : PIXEL_ART.soilLight;
+
+      const body = isGoal
+        ? "#8f6127"
+        : PIXEL_ART.soil;
+
+      const bodyDark = isGoal
+        ? "#5f421f"
+        : PIXEL_ART.soilDark;
+
+      pixelRect(
+        ctx,
+        x,
+        y,
+        width,
+        height,
+        outline
+      );
+
+      pixelRect(
+        ctx,
+        x + 2,
+        y + 2,
+        Math.max(0, width - 4),
+        4,
+        topLight
+      );
+
+      pixelRect(
+        ctx,
+        x + 2,
+        y + 6,
+        Math.max(0, width - 4),
+        5,
+        topMain
+      );
+
+      for (
+        let tileX = x + 4;
+        tileX < x + width - 3;
+        tileX += 12
+      ) {
+        const phase = (
+          Math.floor(tileX / 12) % 3
+        );
+
+        const toothHeight = (
+          phase === 0 ? 4 :
+          phase === 1 ? 2 : 3
+        );
+
+        pixelRect(
+          ctx,
+          tileX,
+          y + 10,
+          5,
+          toothHeight,
+          topDark
+        );
+      }
+
+      pixelRect(
+        ctx,
+        x + 2,
+        y + 12,
+        Math.max(0, width - 4),
+        Math.max(0, height - 14),
+        body
+      );
+
+      for (
+        let tileX = x + 4;
+        tileX < x + width - 2;
+        tileX += 16
+      ) {
+        const tileIndex = Math.floor(
+          (tileX - x) / 16
+        );
+
+        const localWidth = Math.min(
+          14,
+          x + width - 2 - tileX
+        );
+
+        if (localWidth <= 0) {
+          continue;
+        }
+
+        if (tileIndex % 2 === 0) {
+          pixelRect(
+            ctx,
+            tileX,
+            y + 14,
+            localWidth,
+            4,
+            bodyLight
+          );
+        }
+
+        pixelRect(
+          ctx,
+          tileX + Math.max(0, localWidth - 3),
+          y + 18,
+          Math.min(3, localWidth),
+          Math.max(0, height - 20),
+          bodyDark
+        );
+
+        if (
+          deterministicHash(
+            tileX,
+            Math.round(rect.y)
+          ) > 0.45
+        ) {
+          pixelRect(
+            ctx,
+            tileX + 3,
+            y + 17,
+            Math.min(5, localWidth),
+            2,
+            bodyDark
+          );
+        }
+      }
+
+      pixelRect(
+        ctx,
+        x + 2,
+        y + height - 4,
+        Math.max(0, width - 4),
+        2,
+        bodyDark
+      );
+
+      if (isGoal) {
+        const glintPhase = (
+          Math.floor(performance.now() / 180)
+        ) % 4;
+
+        for (
+          let glintX = x + 12 + glintPhase * 7;
+          glintX < x + width - 8;
+          glintX += 42
+        ) {
+          pixelRect(
+            ctx,
+            glintX,
+            y + 3,
+            4,
+            2,
+            "#fff9c4"
+          );
+
+          pixelRect(
+            ctx,
+            glintX + 1,
+            y + 1,
+            2,
+            6,
+            "#fff9c4"
+          );
+        }
+      }
+
+      ctx.restore();
+    }
+
+
+    function drawPixelBlock(
+      ctx,
+      rect
+    ) {
+      const x = Math.round(rect.x);
+      const y = Math.round(rect.y);
+      const width = Math.round(rect.w);
+      const height = Math.round(rect.h);
+
+      if (width <= 0 || height <= 0) {
+        return;
+      }
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, width, height);
+      ctx.clip();
+
+      pixelRect(
+        ctx,
+        x,
+        y,
+        width,
+        height,
+        PIXEL_ART.darkOutline
+      );
+
+      pixelRect(
+        ctx,
+        x + 3,
+        y + 3,
+        Math.max(0, width - 6),
+        Math.max(0, height - 6),
+        PIXEL_ART.metalDark
+      );
+
+      const panelSize = 24;
+
+      for (
+        let panelY = y + 4;
+        panelY < y + height - 3;
+        panelY += panelSize
+      ) {
+        for (
+          let panelX = x + 4;
+          panelX < x + width - 3;
+          panelX += panelSize
+        ) {
+          const panelWidth = Math.min(
+            panelSize - 2,
+            x + width - 4 - panelX
+          );
+
+          const panelHeight = Math.min(
+            panelSize - 2,
+            y + height - 4 - panelY
+          );
+
+          if (
+            panelWidth <= 0 ||
+            panelHeight <= 0
+          ) {
+            continue;
+          }
+
+          const variation = deterministicHash(
+            panelX,
+            panelY
+          );
+
+          pixelRect(
+            ctx,
+            panelX,
+            panelY,
+            panelWidth,
+            panelHeight,
+            variation > 0.5
+              ? PIXEL_ART.metal
+              : "#5b606f"
+          );
+
+          pixelRect(
+            ctx,
+            panelX,
+            panelY,
+            panelWidth,
+            3,
+            PIXEL_ART.metalLight
+          );
+
+          pixelRect(
+            ctx,
+            panelX + panelWidth - 3,
+            panelY + 3,
+            3,
+            Math.max(0, panelHeight - 3),
+            PIXEL_ART.metalDeep
+          );
+
+          if (
+            panelWidth >= 10 &&
+            panelHeight >= 10
+          ) {
+            pixelRect(
+              ctx,
+              panelX + 3,
+              panelY + 5,
+              3,
+              3,
+              PIXEL_ART.bolt
+            );
+
+            pixelRect(
+              ctx,
+              panelX + panelWidth - 6,
+              panelY + panelHeight - 6,
+              3,
+              3,
+              PIXEL_ART.bolt
+            );
+          }
+        }
+      }
+
+      pixelRect(
+        ctx,
+        x + 3,
+        y + 3,
+        Math.max(0, width - 6),
+        4,
+        PIXEL_ART.metalLight
+      );
+
+      const arrowStep = 42;
+
+      for (
+        let arrowY = y + 18;
+        arrowY < y + height - 12;
+        arrowY += arrowStep
+      ) {
+        pixelRect(
+          ctx,
+          x + 5,
+          arrowY,
+          4,
+          4,
+          PIXEL_ART.bounceDark
+        );
+
+        pixelRect(
+          ctx,
+          x + 9,
+          arrowY - 4,
+          4,
+          4,
+          PIXEL_ART.bounceLight
+        );
+
+        pixelRect(
+          ctx,
+          x + 9,
+          arrowY + 4,
+          4,
+          4,
+          PIXEL_ART.bounceLight
+        );
+
+        pixelRect(
+          ctx,
+          x + width - 9,
+          arrowY,
+          4,
+          4,
+          PIXEL_ART.bounceDark
+        );
+
+        pixelRect(
+          ctx,
+          x + width - 13,
+          arrowY - 4,
+          4,
+          4,
+          PIXEL_ART.bounceLight
+        );
+
+        pixelRect(
+          ctx,
+          x + width - 13,
+          arrowY + 4,
+          4,
+          4,
+          PIXEL_ART.bounceLight
+        );
+      }
+
+      ctx.restore();
+    }
+
+
+    function drawPixelChicken(
+      ctx,
+      x,
+      y,
+      facing,
+      state,
+      animationFrame,
+      bounceFlashTimer
+    ) {
+      const pixelSize = 2;
+
+      function spritePixel(
+        px,
+        py,
+        width,
+        height,
+        color
+      ) {
+        pixelRect(
+          ctx,
+          px * pixelSize,
+          py * pixelSize,
+          width * pixelSize,
+          height * pixelSize,
+          color
+        );
+      }
+
+      ctx.save();
+      ctx.translate(
+        Math.round(x),
+        Math.round(y)
+      );
+
+      if (facing < 0) {
+        ctx.translate(PLAYER_WIDTH, 0);
+        ctx.scale(-1, 1);
+      }
+
+      const runFrame = animationFrame % 4;
+      const idleFrame = (
+        Math.floor(animationFrame / 3) % 2
+      );
+
+      const idleBob = (
+        state === "idle"
+          ? idleFrame
+          : 0
+      );
+
+      const crouch = (
+        state === "charge"
+          ? 4
+          : 0
+      );
+
+      const bodyY = 8 + idleBob + crouch;
+
+      if (
+        state === "idle" ||
+        state === "run" ||
+        state === "charge"
+      ) {
+        spritePixel(
+          3,
+          23,
+          11,
+          1,
+          "rgba(24, 19, 24, 0.36)"
+        );
+      }
+
+      spritePixel(
+        0,
+        bodyY + 5,
+        4,
+        4,
+        PIXEL_ART.outline
+      );
+
+      spritePixel(
+        1,
+        bodyY + 4,
+        3,
+        2,
+        PIXEL_ART.chickLight
+      );
+
+      spritePixel(
+        1,
+        bodyY + 7,
+        3,
+        2,
+        PIXEL_ART.chickShadow
+      );
+
+      spritePixel(
+        3,
+        bodyY,
+        10,
+        12 - crouch,
+        PIXEL_ART.outline
+      );
+
+      spritePixel(
+        2,
+        bodyY + 3,
+        12,
+        7 - Math.floor(crouch / 2),
+        PIXEL_ART.outline
+      );
+
+      spritePixel(
+        4,
+        bodyY + 1,
+        8,
+        10 - crouch,
+        PIXEL_ART.chickBody
+      );
+
+      spritePixel(
+        3,
+        bodyY + 4,
+        10,
+        Math.max(
+          3,
+          5 - Math.floor(crouch / 2)
+        ),
+        PIXEL_ART.chickBody
+      );
+
+      spritePixel(
+        4,
+        bodyY + 8 - crouch,
+        8,
+        3,
+        PIXEL_ART.chickShadow
+      );
+
+      spritePixel(
+        9,
+        bodyY + 2,
+        3,
+        5,
+        PIXEL_ART.chickLight
+      );
+
+      spritePixel(
+        4,
+        bodyY + 9 - crouch,
+        3,
+        2,
+        PIXEL_ART.chickDeepShadow
+      );
+
+      if (state === "jump") {
+        spritePixel(
+          3,
+          bodyY - 2,
+          6,
+          6,
+          PIXEL_ART.outline
+        );
+
+        spritePixel(
+          4,
+          bodyY - 1,
+          4,
+          4,
+          PIXEL_ART.chickShadow
+        );
+
+        spritePixel(
+          5,
+          bodyY - 1,
+          2,
+          2,
+          PIXEL_ART.chickLight
+        );
+
+      } else if (state === "fall") {
+        spritePixel(
+          2,
+          bodyY + 4,
+          6,
+          8,
+          PIXEL_ART.outline
+        );
+
+        spritePixel(
+          3,
+          bodyY + 5,
+          4,
+          6,
+          PIXEL_ART.chickShadow
+        );
+
+        spritePixel(
+          4,
+          bodyY + 6,
+          2,
+          3,
+          PIXEL_ART.chickLight
+        );
+
+      } else if (state === "run") {
+        const wingOffset = runFrame < 2
+          ? 0
+          : 1;
+
+        spritePixel(
+          4,
+          bodyY + 3 + wingOffset,
+          5,
+          6,
+          PIXEL_ART.outline
+        );
+
+        spritePixel(
+          5,
+          bodyY + 4 + wingOffset,
+          3,
+          4,
+          PIXEL_ART.chickShadow
+        );
+
+        spritePixel(
+          5,
+          bodyY + 4 + wingOffset,
+          2,
+          1,
+          PIXEL_ART.chickLight
+        );
+
+      } else {
+        spritePixel(
+          4,
+          bodyY + 4,
+          5,
+          5,
+          PIXEL_ART.outline
+        );
+
+        spritePixel(
+          5,
+          bodyY + 5,
+          3,
+          3,
+          PIXEL_ART.chickShadow
+        );
+
+        spritePixel(
+          5,
+          bodyY + 5,
+          2,
+          1,
+          PIXEL_ART.chickLight
+        );
+      }
+
+      const headY = bodyY - 6;
+
+      spritePixel(
+        8,
+        headY,
+        7,
+        9,
+        PIXEL_ART.outline
+      );
+
+      spritePixel(
+        9,
+        headY + 1,
+        5,
+        7,
+        PIXEL_ART.chickBody
+      );
+
+      spritePixel(
+        9,
+        headY + 1,
+        3,
+        2,
+        PIXEL_ART.chickLight
+      );
+
+      spritePixel(
+        13,
+        headY + 5,
+        1,
+        3,
+        PIXEL_ART.chickShadow
+      );
+
+      spritePixel(
+        10,
+        headY - 2,
+        2,
+        3,
+        PIXEL_ART.chickComb
+      );
+
+      spritePixel(
+        12,
+        headY - 3,
+        2,
+        4,
+        PIXEL_ART.chickComb
+      );
+
+      spritePixel(
+        14,
+        headY - 1,
+        1,
+        2,
+        PIXEL_ART.chickComb
+      );
+
+      const blink = (
+        Math.floor(performance.now() / 100) % 47
+      ) === 0;
+
+      if (blink) {
+        spritePixel(
+          12,
+          headY + 3,
+          2,
+          1,
+          PIXEL_ART.chickEye
+        );
+      } else {
+        spritePixel(
+          12,
+          headY + 2,
+          2,
+          2,
+          PIXEL_ART.chickEye
+        );
+
+        spritePixel(
+          12,
+          headY + 2,
+          1,
+          1,
+          PIXEL_ART.chickEyeLight
+        );
+      }
+
+      spritePixel(
+        15,
+        headY + 4,
+        2,
+        3,
+        PIXEL_ART.outline
+      );
+
+      spritePixel(
+        15,
+        headY + 4,
+        2,
+        1,
+        PIXEL_ART.chickBeak
+      );
+
+      spritePixel(
+        15,
+        headY + 5,
+        1,
+        1,
+        PIXEL_ART.chickBeak
+      );
+
+      if (state !== "charge") {
+        if (state === "jump") {
+          spritePixel(
+            5,
+            bodyY + 11,
+            4,
+            2,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            10,
+            bodyY + 10,
+            3,
+            2,
+            PIXEL_ART.chickLeg
+          );
+
+        } else if (state === "fall") {
+          spritePixel(
+            6,
+            bodyY + 11,
+            2,
+            4,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            10,
+            bodyY + 11,
+            2,
+            4,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            5,
+            bodyY + 14,
+            4,
+            1,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            9,
+            bodyY + 14,
+            4,
+            1,
+            PIXEL_ART.chickLeg
+          );
+
+        } else if (state === "run") {
+          if (runFrame < 2) {
+            spritePixel(
+              5,
+              bodyY + 11,
+              2,
+              3,
+              PIXEL_ART.chickLeg
+            );
+
+            spritePixel(
+              4,
+              bodyY + 13,
+              4,
+              1,
+              PIXEL_ART.chickLeg
+            );
+
+            spritePixel(
+              10,
+              bodyY + 11,
+              4,
+              1,
+              PIXEL_ART.chickLeg
+            );
+          } else {
+            spritePixel(
+              10,
+              bodyY + 11,
+              2,
+              3,
+              PIXEL_ART.chickLeg
+            );
+
+            spritePixel(
+              9,
+              bodyY + 13,
+              4,
+              1,
+              PIXEL_ART.chickLeg
+            );
+
+            spritePixel(
+              4,
+              bodyY + 11,
+              4,
+              1,
+              PIXEL_ART.chickLeg
+            );
+          }
+        } else {
+          spritePixel(
+            6,
+            bodyY + 11,
+            2,
+            3,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            10,
+            bodyY + 11,
+            2,
+            3,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            5,
+            bodyY + 13,
+            4,
+            1,
+            PIXEL_ART.chickLeg
+          );
+
+          spritePixel(
+            9,
+            bodyY + 13,
+            4,
+            1,
+            PIXEL_ART.chickLeg
+          );
+        }
+      }
+
+      if (state === "charge") {
+        const chargePhase = (
+          Math.floor(performance.now() / 100)
+        ) % 3;
+
+        spritePixel(
+          1 + chargePhase,
+          bodyY + 1,
+          1,
+          1,
+          PIXEL_ART.bounceLight
+        );
+
+        spritePixel(
+          14 - chargePhase,
+          bodyY + 10,
+          1,
+          1,
+          PIXEL_ART.bounceLight
+        );
+      }
+
+      if (bounceFlashTimer > 0) {
+        const auraPhase = (
+          Math.floor(performance.now() / 45)
+        ) % 2;
+
+        ctx.strokeStyle = PIXEL_ART.bounceLight;
+        ctx.lineWidth = 2;
+        ctx.setLineDash(
+          auraPhase === 0
+            ? [4, 4]
+            : [2, 6]
+        );
+
+        ctx.strokeRect(
+          1,
+          1,
+          PLAYER_WIDTH - 2,
+          PLAYER_HEIGHT - 2
+        );
+
+        ctx.setLineDash([]);
+
+        spritePixel(
+          0,
+          5,
+          2,
+          2,
+          PIXEL_ART.bounceLight
+        );
+
+        spritePixel(
+          15,
+          18,
+          2,
+          2,
+          PIXEL_ART.bounceLight
+        );
+      }
+
+      ctx.restore();
+    }
+
+
+    function drawPixelCloud(
+      ctx,
+      x,
+      y,
+      scale,
+      color,
+      shadowColor
+    ) {
+      const unit = 6 * scale;
+
+      pixelRect(
+        ctx,
+        x + unit,
+        y,
+        unit * 3,
+        unit,
+        color
+      );
+
+      pixelRect(
+        ctx,
+        x,
+        y + unit,
+        unit * 6,
+        unit * 2,
+        color
+      );
+
+      pixelRect(
+        ctx,
+        x + unit * 2,
+        y - unit,
+        unit * 2,
+        unit,
+        color
+      );
+
+      pixelRect(
+        ctx,
+        x + unit,
+        y + unit * 2,
+        unit * 4,
+        unit,
+        shadowColor
+      );
+    }
+
+
+    function drawPixelMountainLayer(
+      ctx,
+      cameraY,
+      baseline,
+      color,
+      highlight,
+      parallax,
+      spacing,
+      peakHeight
+    ) {
+      const offset = positiveModulo(
+        -cameraY * parallax,
+        spacing
+      );
+
+      for (
+        let index = -2;
+        index < 9;
+        index += 1
+      ) {
+        const baseX = (
+          index * spacing + offset
+        );
+
+        const variation = deterministicHash(
+          index,
+          Math.floor(baseline)
+        );
+
+        const width = (
+          spacing * (0.75 + variation * 0.45)
+        );
+
+        const height = (
+          peakHeight * (0.72 + variation * 0.5)
+        );
+
+        const steps = 8;
+
+        for (
+          let step = 0;
+          step < steps;
+          step += 1
+        ) {
+          const ratio = (
+            1 - step / steps
+          );
+
+          const stepWidth = width * ratio;
+          const stepHeight = height / steps;
+
+          pixelRect(
+            ctx,
+            baseX + (width - stepWidth) / 2,
+            baseline - (step + 1) * stepHeight,
+            stepWidth,
+            stepHeight + 1,
+            color
+          );
+        }
+
+        pixelRect(
+          ctx,
+          baseX + width * 0.44,
+          baseline - height,
+          width * 0.12,
+          height * 0.34,
+          highlight
+        );
+      }
+    }
+
+
+    function getBackgroundPalette(height) {
+      if (height < 500) {
+        return {
+          skyTop: "#253b58",
+          skyBottom: "#597696",
+          far: "#35485a",
+          farHighlight: "#526a78",
+          near: "#263542",
+          nearHighlight: "#435766",
+          cloud: "#c8d4cf",
+          cloudShadow: "#92aaa9",
+          stars: false
+        };
+      }
+
+      if (height < 1000) {
+        return {
+          skyTop: "#1f304c",
+          skyBottom: "#475f7b",
+          far: "#303d55",
+          farHighlight: "#4a5870",
+          near: "#222c40",
+          nearHighlight: "#38455d",
+          cloud: "#b9c7cf",
+          cloudShadow: "#8297a6",
+          stars: false
+        };
+      }
+
+      if (height < 1500) {
+        return {
+          skyTop: "#17233d",
+          skyBottom: "#334762",
+          far: "#25324b",
+          farHighlight: "#3a4860",
+          near: "#1d2639",
+          nearHighlight: "#313c50",
+          cloud: "#9eafbd",
+          cloudShadow: "#6e8192",
+          stars: true
+        };
+      }
+
+      return {
+        skyTop: "#0f1428",
+        skyBottom: "#222b48",
+        far: "#1b2238",
+        farHighlight: "#303952",
+        near: "#151b2d",
+        nearHighlight: "#293148",
+        cloud: "#78899c",
+        cloudShadow: "#526477",
+        stars: true
+      };
+    }
+
+
     class Platform {
       constructor(x, y, width, height = 24, isGoal = false) {
         this.rect = {
@@ -679,26 +1962,10 @@
           return;
         }
 
-        ctx.fillStyle = this.isGoal
-          ? COLORS.goal
-          : COLORS.platform;
-
-        ctx.fillRect(
-          drawRect.x,
-          drawRect.y,
-          drawRect.w,
-          drawRect.h
-        );
-
-        ctx.fillStyle = this.isGoal
-          ? COLORS.goalTop
-          : COLORS.platformTop;
-
-        ctx.fillRect(
-          drawRect.x,
-          drawRect.y,
-          drawRect.w,
-          6
+        drawPixelPlatform(
+          ctx,
+          drawRect,
+          this.isGoal
         );
       }
     }
@@ -729,63 +1996,10 @@
           return;
         }
 
-        ctx.fillStyle = COLORS.block;
-        ctx.fillRect(
-          drawRect.x,
-          drawRect.y,
-          drawRect.w,
-          drawRect.h
+        drawPixelBlock(
+          ctx,
+          drawRect
         );
-
-        ctx.strokeStyle = COLORS.blockEdge;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(
-          drawRect.x + 2,
-          drawRect.y + 2,
-          Math.max(0, drawRect.w - 4),
-          Math.max(0, drawRect.h - 4)
-        );
-
-        ctx.strokeStyle = COLORS.blockEdge;
-        ctx.lineWidth = 2;
-
-        const spacing = 34;
-
-        for (
-          let y = drawRect.y + 14;
-          y < drawRect.y + drawRect.h;
-          y += spacing
-        ) {
-          ctx.beginPath();
-          ctx.moveTo(drawRect.x + 6, y);
-          ctx.lineTo(drawRect.x + drawRect.w - 6, y);
-          ctx.stroke();
-        }
-
-        ctx.save();
-        ctx.globalAlpha = 0.34;
-        ctx.strokeStyle = COLORS.bounce;
-        ctx.lineWidth = 2;
-
-        for (
-          let y = drawRect.y + 28;
-          y < drawRect.y + drawRect.h - 12;
-          y += 54
-        ) {
-          ctx.beginPath();
-          ctx.moveTo(drawRect.x + 7, y - 7);
-          ctx.lineTo(drawRect.x + 15, y);
-          ctx.lineTo(drawRect.x + 7, y + 7);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(drawRect.x + drawRect.w - 7, y - 7);
-          ctx.lineTo(drawRect.x + drawRect.w - 15, y);
-          ctx.lineTo(drawRect.x + drawRect.w - 7, y + 7);
-          ctx.stroke();
-        }
-
-        ctx.restore();
       }
     }
     // Level 2 keeps the user's hand-built geometry through 1417 m.
@@ -2136,90 +3350,31 @@ const BLOCK_DATA = [
         const drawX = Math.round(this.x);
         const drawY = Math.round(this.y - cameraY);
 
-        // Experimental charging pose:
-        // one fixed crouch frame with no progressive animation.
-        const compression = this.charging
-          ? 10
-          : 0;
+        let state = "idle";
 
-        const bodyRect = {
-          x: drawX,
-          y: drawY + compression,
-          w: PLAYER_WIDTH,
-          h: PLAYER_HEIGHT - compression
-        };
+        if (this.charging) {
+          state = "charge";
+        } else if (!this.onGround && this.vy < 0) {
+          state = "jump";
+        } else if (!this.onGround && this.vy >= 0) {
+          state = "fall";
+        } else if (Math.abs(this.vx) > 30) {
+          state = "run";
+        }
 
-        roundedRectPath(
-          ctx,
-          bodyRect.x,
-          bodyRect.y,
-          bodyRect.w,
-          bodyRect.h,
-          6
+        const animationFrame = Math.floor(
+          performance.now() / 105
         );
 
-        ctx.fillStyle = COLORS.player;
-        ctx.fill();
-
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = COLORS.playerOutline;
-        ctx.stroke();
-
-        const eyeX = this.facing > 0
-          ? bodyRect.x + bodyRect.w - 10
-          : bodyRect.x + 10;
-
-        const eyeY = bodyRect.y + 15;
-
-        ctx.beginPath();
-        ctx.arc(eyeX, eyeY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = COLORS.black;
-        ctx.fill();
-
-        const noseY = bodyRect.y + 23;
-
-        ctx.beginPath();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = COLORS.playerOutline;
-
-        if (this.facing > 0) {
-          ctx.moveTo(
-            bodyRect.x + bodyRect.w - 2,
-            noseY
-          );
-
-          ctx.lineTo(
-            bodyRect.x + bodyRect.w + 5,
-            noseY
-          );
-        } else {
-          ctx.moveTo(
-            bodyRect.x + 2,
-            noseY
-          );
-
-          ctx.lineTo(
-            bodyRect.x - 5,
-            noseY
-          );
-        }
-
-        ctx.stroke();
-
-        if (this.bounceFlashTimer > 0.0) {
-          ctx.beginPath();
-          ctx.arc(
-            bodyRect.x + bodyRect.w / 2,
-            bodyRect.y + bodyRect.h / 2,
-            30,
-            0,
-            Math.PI * 2
-          );
-
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = COLORS.bounce;
-          ctx.stroke();
-        }
+        drawPixelChicken(
+          ctx,
+          drawX,
+          drawY,
+          this.facing,
+          state,
+          animationFrame,
+          this.bounceFlashTimer
+        );
       }
     }
 
@@ -2229,29 +3384,196 @@ const BLOCK_DATA = [
     // ========================================================
 
     function drawBackground(ctx, cameraY) {
-      ctx.fillStyle = COLORS.sky;
-      ctx.fillRect(
-        0,
-        0,
-        SCREEN_WIDTH,
-        SCREEN_HEIGHT
+      const centerWorldY = (
+        cameraY + SCREEN_HEIGHT * 0.5
       );
 
-      for (let i = 0; i < 70; i += 1) {
-        const x = (i * 193) % SCREEN_WIDTH;
+      const centerHeight = clamp(
+        (
+          START_GROUND_Y -
+          centerWorldY
+        ) / 10,
+        0,
+        MAX_HEIGHT_METERS
+      );
 
-        const screenY = positiveModulo(
-          i * 317 - cameraY * 0.20,
-          SCREEN_HEIGHT
+      const palette = getBackgroundPalette(
+        centerHeight
+      );
+
+      const bandHeight = 20;
+      const topRgb = palette.skyTop.match(
+        /\w\w/g
+      ).map(value => parseInt(value, 16));
+
+      const bottomRgb = palette.skyBottom.match(
+        /\w\w/g
+      ).map(value => parseInt(value, 16));
+
+      for (
+        let y = 0;
+        y < SCREEN_HEIGHT;
+        y += bandHeight
+      ) {
+        const ratio = y / SCREEN_HEIGHT;
+
+        const mixed = topRgb.map(
+          (value, index) => Math.round(
+            value +
+            (
+              bottomRgb[index] -
+              value
+            ) * ratio
+          )
         );
 
-        const radius = i % 4 === 0 ? 2 : 1;
-
-        ctx.beginPath();
-        ctx.arc(x, screenY, radius, 0, Math.PI * 2);
-        ctx.fillStyle = COLORS.sky2;
-        ctx.fill();
+        pixelRect(
+          ctx,
+          0,
+          y,
+          SCREEN_WIDTH,
+          bandHeight + 1,
+          `rgb(${mixed[0]}, ${mixed[1]}, ${mixed[2]})`
+        );
       }
+
+      if (palette.stars) {
+        const starCount = (
+          centerHeight >= 1500 ? 105 : 62
+        );
+
+        for (
+          let index = 0;
+          index < starCount;
+          index += 1
+        ) {
+          const x = Math.floor(
+            deterministicHash(index, 11) *
+            SCREEN_WIDTH
+          );
+
+          const baseY = Math.floor(
+            deterministicHash(index, 29) *
+            SCREEN_HEIGHT
+          );
+
+          const y = positiveModulo(
+            baseY -
+            cameraY * (
+              0.025 +
+              deterministicHash(index, 51) * 0.025
+            ),
+            SCREEN_HEIGHT
+          );
+
+          const bright = (
+            deterministicHash(index, 73) > 0.78
+          );
+
+          const twinkle = (
+            Math.floor(
+              performance.now() / 280 +
+              index
+            ) % 5
+          ) === 0;
+
+          const size = (
+            bright && twinkle ? 3 :
+            bright ? 2 : 1
+          );
+
+          pixelRect(
+            ctx,
+            x,
+            y,
+            size,
+            size,
+            bright
+              ? "#e9e4c9"
+              : "#77839c"
+          );
+        }
+      }
+
+      const cloudAmount = (
+        centerHeight >= 1500 ? 4 : 8
+      );
+
+      for (
+        let index = 0;
+        index < cloudAmount;
+        index += 1
+      ) {
+        const cloudX = positiveModulo(
+          index * 173 +
+          performance.now() * (
+            0.004 +
+            index * 0.0004
+          ),
+          SCREEN_WIDTH + 220
+        ) - 110;
+
+        const cloudY = positiveModulo(
+          index * 127 -
+          cameraY * 0.07,
+          SCREEN_HEIGHT + 180
+        ) - 90;
+
+        const scale = (
+          index % 3 === 0
+            ? 2
+            : 1
+        );
+
+        drawPixelCloud(
+          ctx,
+          Math.round(cloudX),
+          Math.round(cloudY),
+          scale,
+          palette.cloud,
+          palette.cloudShadow
+        );
+      }
+
+      drawPixelMountainLayer(
+        ctx,
+        cameraY,
+        SCREEN_HEIGHT - 86,
+        palette.far,
+        palette.farHighlight,
+        0.04,
+        170,
+        185
+      );
+
+      drawPixelMountainLayer(
+        ctx,
+        cameraY,
+        SCREEN_HEIGHT - 26,
+        palette.near,
+        palette.nearHighlight,
+        0.09,
+        145,
+        230
+      );
+
+      pixelRect(
+        ctx,
+        0,
+        0,
+        8,
+        SCREEN_HEIGHT,
+        "rgba(8, 9, 16, 0.30)"
+      );
+
+      pixelRect(
+        ctx,
+        SCREEN_WIDTH - 8,
+        0,
+        8,
+        SCREEN_HEIGHT,
+        "rgba(8, 9, 16, 0.30)"
+      );
     }
 
 
@@ -2304,11 +3626,29 @@ const BLOCK_DATA = [
       currentHeight,
       recordHeight
     ) {
+      drawPixelPanel(
+        ctx,
+        12,
+        12,
+        270,
+        92
+      );
+
+      drawPixelPanel(
+        ctx,
+        SCREEN_WIDTH - 280,
+        12,
+        268,
+        82
+      );
+
       drawText(
         ctx,
-        currentHeight < 1000 ? "LEVEL 1" : "LEVEL 2",
-        20,
-        20,
+        currentHeight < 1000
+          ? "LEVEL 1"
+          : "LEVEL 2",
+        24,
+        22,
         20,
         COLORS.yellow,
         true
@@ -2316,10 +3656,19 @@ const BLOCK_DATA = [
 
       drawText(
         ctx,
+        getSectionName(currentHeight),
+        24,
+        50,
+        15,
+        COLORS.white
+      );
+
+      drawText(
+        ctx,
         `${Math.round(currentHeight)} / 2000 m`,
-        SCREEN_WIDTH - 20,
-        20,
-        26,
+        SCREEN_WIDTH - 24,
+        22,
+        24,
         COLORS.white,
         true,
         "right"
@@ -2327,22 +3676,13 @@ const BLOCK_DATA = [
 
       drawText(
         ctx,
-        `Record: ${Math.round(recordHeight)} m`,
-        SCREEN_WIDTH - 20,
-        58,
-        16,
+        `RECORD ${Math.round(recordHeight)} m`,
+        SCREEN_WIDTH - 24,
+        57,
+        14,
         COLORS.yellow,
         false,
         "right"
-      );
-
-      drawText(
-        ctx,
-        getSectionName(currentHeight),
-        20,
-        52,
-        16,
-        COLORS.white
       );
 
       const progress = clamp(
@@ -2351,27 +3691,63 @@ const BLOCK_DATA = [
         1.0
       );
 
-      const barX = 20;
-      const barY = 82;
-      const barWidth = 220;
-      const barHeight = 10;
+      const barX = 24;
+      const barY = 78;
+      const barWidth = 244;
+      const barHeight = 12;
+      const segmentWidth = 10;
+      const segmentGap = 2;
+      const segmentCount = Math.floor(
+        barWidth /
+        (segmentWidth + segmentGap)
+      );
 
-      ctx.fillStyle = COLORS.chargeBg;
-      ctx.fillRect(
+      pixelRect(
+        ctx,
+        barX - 3,
+        barY - 3,
+        barWidth + 6,
+        barHeight + 6,
+        PIXEL_ART.darkOutline
+      );
+
+      pixelRect(
+        ctx,
         barX,
         barY,
         barWidth,
-        barHeight
+        barHeight,
+        PIXEL_ART.uiInner
       );
 
-      ctx.fillStyle = COLORS.yellow;
-      ctx.fillRect(
-        barX,
-        barY,
-        Math.trunc(barWidth * progress),
-        barHeight
+      const litSegments = Math.floor(
+        progress * segmentCount
       );
 
+      for (
+        let index = 0;
+        index < segmentCount;
+        index += 1
+      ) {
+        pixelRect(
+          ctx,
+          barX +
+          index * (
+            segmentWidth +
+            segmentGap
+          ),
+          barY + 2,
+          segmentWidth,
+          barHeight - 4,
+          index < litSegments
+            ? (
+                currentHeight >= 1000
+                  ? PIXEL_ART.goalLight
+                  : PIXEL_ART.grassLight
+              )
+            : "#292a35"
+        );
+      }
     }
 
 
@@ -2431,6 +3807,9 @@ const BLOCK_DATA = [
 
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+
+    // Keep every procedural pixel crisp when Canvas is scaled.
+    ctx.imageSmoothingEnabled = false;
 
     const { platforms, blocks } = createLevel();
 
